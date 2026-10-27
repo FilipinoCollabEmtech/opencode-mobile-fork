@@ -58,6 +58,7 @@
       "label": "Language",
       "title": "Choose Language",
       "system": "System Default",
+      "systemDescription": "Follow your device's language",
       "en": "English",
       "zhHans": "Simplified Chinese"
     },
@@ -94,11 +95,13 @@
       "placeholderDefault": "Type a message..."
     },
     "actions": {
+      "copyMessage": "Copy",
       "editMessage": "Edit message",
       "replace": "Replace"
     },
     "alerts": {
       "messageActionsTitle": "Message actions",
+      "copiedMessage": "Copied to clipboard",
       "notSupportedTitle": "Not supported",
       "notSupportedMessage": "Editing sent messages needs a newer opencode server. Please update the server and try again.",
       "revertAuthFailedTitle": "Authentication failed",
@@ -252,6 +255,10 @@
       "daysAgo": "{{count}}d ago"
     },
     "filesCount": "{{count}} files",
+    "search": {
+      "placeholder": "Search sessions or projects",
+      "clear": "Clear search"
+    },
     "actions": {
       "rename": "Rename"
     },
@@ -273,7 +280,8 @@
       "authFailedTitle": "Authentication Failed",
       "authFailedSubtitle": "{{name}} rejected your credentials. Check the username and password to reconnect.",
       "checkCredentialsButton": "Check Credentials",
-      "noSessions": "No sessions yet"
+      "noSessions": "No sessions yet",
+      "noSearchResults": "No sessions match \"{{query}}\""
     },
     "newSessionModal": {
       "title": "New Session",

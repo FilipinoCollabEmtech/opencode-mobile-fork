@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native"
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTranslation } from "react-i18next"
 
@@ -88,7 +88,12 @@ export function QuestionPrompt({ request, isDark, onReply, onReject }: Props) {
       </View>
       <Text style={[s.question, isDark && s.textWhite]}>{q.question}</Text>
 
-      <View style={s.options}>
+      <ScrollView
+        style={s.optionsScroll}
+        contentContainerStyle={s.options}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+      >
         {q.options.map((opt) => {
           const selected = (answers[current] || []).includes(opt.label)
           return (
@@ -129,7 +134,7 @@ export function QuestionPrompt({ request, isDark, onReply, onReject }: Props) {
               <Text style={[s.optionLabel, { color: "#8b5cf6" }]}>{t("chat.questionPrompt.customAnswerLabel")}</Text>
             </TouchableOpacity>
           ))}
-      </View>
+      </ScrollView>
 
       <View style={s.footer}>
         <TouchableOpacity onPress={reject}>
@@ -173,6 +178,7 @@ const s = StyleSheet.create({
   metaDark: { color: "#666666" },
 
   options: { gap: 8 },
+  optionsScroll: { maxHeight: 260 },
   option: {
     padding: 12,
     borderRadius: 8,

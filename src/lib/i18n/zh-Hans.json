@@ -58,6 +58,7 @@
       "label": "语言",
       "title": "选择语言",
       "system": "跟随系统",
+      "systemDescription": "使用设备的语言设置",
       "en": "English",
       "zhHans": "简体中文"
     },
@@ -94,11 +95,13 @@
       "placeholderDefault": "输入消息..."
     },
     "actions": {
+      "copyMessage": "复制",
       "editMessage": "编辑消息",
       "replace": "替换"
     },
     "alerts": {
       "messageActionsTitle": "消息操作",
+      "copiedMessage": "已复制到剪贴板",
       "notSupportedTitle": "不支持此操作",
       "notSupportedMessage": "编辑已发送的消息需要更新的 opencode 服务器版本。请更新服务器后重试。",
       "revertAuthFailedTitle": "身份验证失败",
@@ -252,6 +255,10 @@
       "daysAgo": "{{count}} 天前"
     },
     "filesCount": "{{count}} 个文件",
+    "search": {
+      "placeholder": "搜索会话或项目",
+      "clear": "清除搜索"
+    },
     "actions": {
       "rename": "重命名"
     },
@@ -273,7 +280,8 @@
       "authFailedTitle": "身份验证失败",
       "authFailedSubtitle": "{{name}} 拒绝了您的凭据。请检查用户名和密码后重新连接。",
       "checkCredentialsButton": "检查凭据",
-      "noSessions": "暂无会话"
+      "noSessions": "暂无会话",
+      "noSearchResults": "没有匹配「{{query}}」的会话"
     },
     "newSessionModal": {
       "title": "新建会话",

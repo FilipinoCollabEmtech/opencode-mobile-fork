@@ -21,6 +21,7 @@ import {
   granted as notificationsGranted,
 } from "../../src/lib/notifications"
 import type { Category } from "../../src/lib/notifications"
+import { OptionSheet, type OptionSheetOption } from "../../src/components/OptionSheet"
 import { hasTelemetryConsent, setTelemetryConsent } from "../../src/lib/telemetry"
 import { PRIVACY_POLICY_URL } from "../../src/lib/links"
 import { CURRENT_VERSION, checkForUpdate, type AvailableUpdate } from "../../src/lib/update-check"
@@ -79,6 +80,7 @@ export default function SettingsScreen() {
   const { notifications, setNotification, locale, setLocale } = useSettings()
   const [osGranted, setOsGranted] = useState<boolean | null>(null)
   const [telemetryUpdating, setTelemetryUpdating] = useState(false)
+  const [languageOpen, setLanguageOpen] = useState(false)
 
   // Settings is where a user goes to ask "what am I running?". Answer it, and if
   // a newer build exists say so here too — the banner on the sessions list is
@@ -133,12 +135,22 @@ export default function SettingsScreen() {
     [setNotification, t],
   )
 
-  // Lazy-check OS permission for status display
-  if (osGranted === null) {
+  // Check OS permission once for status display. Doing this in an effect (not
+  // during render) avoids firing a fresh promise on every re-render while the
+  // result is still unknown.
+  useEffect(() => {
+    let cancelled = false
     notificationsGranted()
-      .then(setOsGranted)
-      .catch(() => setOsGranted(false))
-  }
+      .then((granted) => {
+        if (!cancelled) setOsGranted(granted)
+      })
+      .catch(() => {
+        if (!cancelled) setOsGranted(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const localeLabels: Record<LocalePreference, string> = {
     system: t("settings.language.system"),
@@ -146,167 +158,178 @@ export default function SettingsScreen() {
     "zh-Hans": t("settings.language.zhHans"),
   }
 
-  const handleLanguagePress = useCallback(() => {
-    Alert.alert(t("settings.language.title"), undefined, [
-      { text: localeLabels.system, onPress: () => setLocale("system") },
-      { text: localeLabels.en, onPress: () => setLocale("en") },
-      { text: localeLabels["zh-Hans"], onPress: () => setLocale("zh-Hans") },
-      { text: t("common.cancel"), style: "cancel" },
-    ])
-  }, [t, setLocale, localeLabels])
+  const languageOptions: OptionSheetOption<LocalePreference>[] = [
+    { value: "system", label: localeLabels.system, description: t("settings.language.systemDescription") },
+    { value: "en", label: localeLabels.en },
+    { value: "zh-Hans", label: localeLabels["zh-Hans"] },
+  ]
+
+  // A four-option Alert silently loses its extra buttons on Android, which is
+  // why the language picker is a real sheet instead of Alert.alert.
+  const handleLanguagePress = useCallback(() => setLanguageOpen(true), [])
 
   return (
-    <ScrollView style={[styles.container, isDark && styles.containerDark]} contentContainerStyle={styles.content}>
-      <SettingSection title={t("settings.sections.security")} isDark={isDark}>
-        <SettingRow
-          icon="finger-print"
-          label={t("settings.security.biometricOpen.label")}
-          description={
-            hasBiometrics
-              ? t("settings.security.biometricOpen.descriptionEnabled")
-              : t("settings.security.biometricOpen.descriptionUnavailable")
-          }
-          isDark={isDark}
-          right={
-            <Switch
-              value={settings.requireBiometric}
-              onValueChange={(value) => updateSettings({ requireBiometric: value })}
-              disabled={!hasBiometrics}
-              trackColor={{ false: "#767577", true: "#22c55e" }}
-            />
-          }
-        />
-        <SettingRow
-          icon="lock-closed"
-          label={t("settings.security.biometricSend.label")}
-          description={t("settings.security.biometricSend.description")}
-          isDark={isDark}
-          right={
-            <Switch
-              value={settings.requireBiometricForMessages}
-              onValueChange={(value) => updateSettings({ requireBiometricForMessages: value })}
-              disabled={!hasBiometrics || !settings.requireBiometric}
-              trackColor={{ false: "#767577", true: "#22c55e" }}
-            />
-          }
-        />
-        {settings.requireBiometric && (
+    <>
+      <ScrollView style={[styles.container, isDark && styles.containerDark]} contentContainerStyle={styles.content}>
+        <SettingSection title={t("settings.sections.security")} isDark={isDark}>
           <SettingRow
-            icon="exit"
-            label={t("settings.security.lockNow.label")}
-            description={t("settings.security.lockNow.description")}
+            icon="finger-print"
+            label={t("settings.security.biometricOpen.label")}
+            description={
+              hasBiometrics
+                ? t("settings.security.biometricOpen.descriptionEnabled")
+                : t("settings.security.biometricOpen.descriptionUnavailable")
+            }
             isDark={isDark}
-            onPress={lock}
+            right={
+              <Switch
+                value={settings.requireBiometric}
+                onValueChange={(value) => updateSettings({ requireBiometric: value })}
+                disabled={!hasBiometrics}
+                trackColor={{ false: "#767577", true: "#22c55e" }}
+              />
+            }
+          />
+          <SettingRow
+            icon="lock-closed"
+            label={t("settings.security.biometricSend.label")}
+            description={t("settings.security.biometricSend.description")}
+            isDark={isDark}
+            right={
+              <Switch
+                value={settings.requireBiometricForMessages}
+                onValueChange={(value) => updateSettings({ requireBiometricForMessages: value })}
+                disabled={!hasBiometrics || !settings.requireBiometric}
+                trackColor={{ false: "#767577", true: "#22c55e" }}
+              />
+            }
+          />
+          {settings.requireBiometric && (
+            <SettingRow
+              icon="exit"
+              label={t("settings.security.lockNow.label")}
+              description={t("settings.security.lockNow.description")}
+              isDark={isDark}
+              onPress={lock}
+              right={<Ionicons name="chevron-forward" size={20} color={isDark ? "#666666" : "#999999"} />}
+            />
+          )}
+        </SettingSection>
+
+        <SettingSection title={t("settings.sections.notifications")} isDark={isDark}>
+          {categories.map((category) => {
+            const meta = categoryMeta[category]
+            return (
+              <SettingRow
+                key={category}
+                icon={meta.icon as keyof typeof Ionicons.glyphMap}
+                label={t(meta.labelKey)}
+                description={t(meta.descriptionKey)}
+                isDark={isDark}
+                right={
+                  <Switch
+                    value={notifications[category]}
+                    onValueChange={(value) => handleToggle(category, value)}
+                    trackColor={{ false: "#767577", true: "#22c55e" }}
+                  />
+                }
+              />
+            )
+          })}
+          {osGranted === false && (
+            <View style={[styles.noticeRow, isDark && styles.settingRowDark]}>
+              <Text style={styles.noticeText}>{t("settings.notifications.disabledNotice")}</Text>
+            </View>
+          )}
+        </SettingSection>
+
+        <SettingSection title={t("settings.sections.privacy")} isDark={isDark}>
+          <SettingRow
+            icon="shield-checkmark"
+            label={t("settings.privacy.crashReporting.label")}
+            description={t("settings.privacy.crashReporting.description")}
+            isDark={isDark}
+            right={
+              <Switch
+                value={crashReporting}
+                onValueChange={handleCrashReportingToggle}
+                disabled={telemetryUpdating}
+                trackColor={{ false: "#767577", true: "#22c55e" }}
+              />
+            }
+          />
+          <SettingRow
+            icon="document-text"
+            label={t("settings.privacy.privacyPolicy.label")}
+            description={t("settings.privacy.privacyPolicy.description")}
+            isDark={isDark}
+            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
+          />
+        </SettingSection>
+
+        <SettingSection title={t("settings.sections.about")} isDark={isDark}>
+          <SettingRow
+            icon="language"
+            label={t("settings.language.label")}
+            description={localeLabels[locale]}
+            isDark={isDark}
+            onPress={handleLanguagePress}
             right={<Ionicons name="chevron-forward" size={20} color={isDark ? "#666666" : "#999999"} />}
           />
-        )}
-      </SettingSection>
+          <SettingRow
+            icon="information-circle"
+            label={t("settings.about.version")}
+            // Was hard-coded "1.0.0" — wrong for every build ever shipped, and the
+            // one place a user could have checked what they are running while 64%
+            // of the base sat on a four-week-old build (AGE-110).
+            description={
+              updateAvailable
+                ? `${CURRENT_VERSION} → ${updateAvailable.version}`
+                : `${CURRENT_VERSION} · ${t("update.upToDate")}`
+            }
+            isDark={isDark}
+            onPress={updateAvailable ? () => Linking.openURL(updateAvailable.url) : undefined}
+            right={
+              updateAvailable ? (
+                <Ionicons name="arrow-up-circle" size={20} color={isDark ? "#7dd3fc" : "#0369a1"} />
+              ) : undefined
+            }
+          />
+          <SettingRow
+            icon="logo-github"
+            label={t("settings.about.github.label")}
+            description={t("settings.about.github.description")}
+            isDark={isDark}
+            onPress={() => Linking.openURL("https://github.com/anomalyco/opencode")}
+            right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
+          />
+          <SettingRow
+            icon="document-text"
+            label={t("settings.about.docs.label")}
+            description={t("settings.about.docs.description")}
+            isDark={isDark}
+            onPress={() => Linking.openURL("https://opencode.ai/docs")}
+            right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
+          />
+        </SettingSection>
 
-      <SettingSection title={t("settings.sections.notifications")} isDark={isDark}>
-        {categories.map((category) => {
-          const meta = categoryMeta[category]
-          return (
-            <SettingRow
-              key={category}
-              icon={meta.icon as keyof typeof Ionicons.glyphMap}
-              label={t(meta.labelKey)}
-              description={t(meta.descriptionKey)}
-              isDark={isDark}
-              right={
-                <Switch
-                  value={notifications[category]}
-                  onValueChange={(value) => handleToggle(category, value)}
-                  trackColor={{ false: "#767577", true: "#22c55e" }}
-                />
-              }
-            />
-          )
-        })}
-        {osGranted === false && (
-          <View style={[styles.settingRow, isDark && styles.settingRowDark]}>
-            <Text style={[styles.settingDescription, { color: "#ef4444", paddingLeft: 48 }]}>
-              {t("settings.notifications.disabledNotice")}
-            </Text>
-          </View>
-        )}
-      </SettingSection>
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, isDark && styles.metaDark]}>{t("settings.footer.appName")}</Text>
+          <Text style={[styles.footerText, isDark && styles.metaDark]}>{t("settings.footer.tagline")}</Text>
+        </View>
+      </ScrollView>
 
-      <SettingSection title={t("settings.sections.privacy")} isDark={isDark}>
-        <SettingRow
-          icon="shield-checkmark"
-          label={t("settings.privacy.crashReporting.label")}
-          description={t("settings.privacy.crashReporting.description")}
-          isDark={isDark}
-          right={
-            <Switch
-              value={crashReporting}
-              onValueChange={handleCrashReportingToggle}
-              disabled={telemetryUpdating}
-              trackColor={{ false: "#767577", true: "#22c55e" }}
-            />
-          }
-        />
-        <SettingRow
-          icon="document-text"
-          label={t("settings.privacy.privacyPolicy.label")}
-          description={t("settings.privacy.privacyPolicy.description")}
-          isDark={isDark}
-          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
-          right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
-        />
-      </SettingSection>
-
-      <SettingSection title={t("settings.sections.about")} isDark={isDark}>
-        <SettingRow
-          icon="language"
-          label={t("settings.language.label")}
-          description={localeLabels[locale]}
-          isDark={isDark}
-          onPress={handleLanguagePress}
-          right={<Ionicons name="chevron-forward" size={20} color={isDark ? "#666666" : "#999999"} />}
-        />
-        <SettingRow
-          icon="information-circle"
-          label={t("settings.about.version")}
-          // Was hard-coded "1.0.0" — wrong for every build ever shipped, and the
-          // one place a user could have checked what they are running while 64%
-          // of the base sat on a four-week-old build (AGE-110).
-          description={
-            updateAvailable
-              ? `${CURRENT_VERSION} → ${updateAvailable.version}`
-              : `${CURRENT_VERSION} · ${t("update.upToDate")}`
-          }
-          isDark={isDark}
-          onPress={updateAvailable ? () => Linking.openURL(updateAvailable.url) : undefined}
-          right={
-            updateAvailable ? (
-              <Ionicons name="arrow-up-circle" size={20} color={isDark ? "#7dd3fc" : "#0369a1"} />
-            ) : undefined
-          }
-        />
-        <SettingRow
-          icon="logo-github"
-          label={t("settings.about.github.label")}
-          description={t("settings.about.github.description")}
-          isDark={isDark}
-          onPress={() => Linking.openURL("https://github.com/anomalyco/opencode")}
-          right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
-        />
-        <SettingRow
-          icon="document-text"
-          label={t("settings.about.docs.label")}
-          description={t("settings.about.docs.description")}
-          isDark={isDark}
-          onPress={() => Linking.openURL("https://opencode.ai/docs")}
-          right={<Ionicons name="open-outline" size={20} color={isDark ? "#666666" : "#999999"} />}
-        />
-      </SettingSection>
-
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, isDark && styles.metaDark]}>{t("settings.footer.appName")}</Text>
-        <Text style={[styles.footerText, isDark && styles.metaDark]}>{t("settings.footer.tagline")}</Text>
-      </View>
-    </ScrollView>
+      <OptionSheet
+        visible={languageOpen}
+        title={t("settings.language.title")}
+        options={languageOptions}
+        value={locale}
+        isDark={isDark}
+        onSelect={(next) => setLocale(next)}
+        onClose={() => setLanguageOpen(false)}
+      />
+    </>
   )
 }
 
@@ -337,8 +360,9 @@ const styles = StyleSheet.create({
   },
   sectionContent: {
     backgroundColor: "#ffffff",
+    // Only a top divider: each SettingRow owns its bottom border, so adding
+    // one here doubled the line at the end of every section.
     borderTopWidth: 1,
-    borderBottomWidth: 1,
     borderColor: "#e5e5e5",
   },
   sectionContentDark: {
@@ -382,6 +406,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666666",
     marginTop: 2,
+  },
+  noticeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingRight: 16,
+    // Line the warning up with the row descriptions (16 margin + 36 icon + 12 gap).
+    paddingLeft: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e5e5",
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#ef4444",
+    lineHeight: 18,
   },
   metaDark: {
     color: "#888888",

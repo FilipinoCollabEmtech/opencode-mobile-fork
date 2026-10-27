@@ -195,6 +195,8 @@ export default function SessionsScreen() {
   // session, or to switch the active connection's directory.
   const [browseMode, setBrowseMode] = useState<"create" | "switch">("create")
   const [refreshing, setRefreshing] = useState(false)
+  // Session search. Matches title or project directory, case-insensitively.
+  const [query, setQuery] = useState("")
   // Directories collapsed in the grouped session list. Empty by default —
   // all groups start expanded (#67).
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
@@ -210,10 +212,20 @@ export default function SessionsScreen() {
 
   // Flatten sessions into header+item rows. Skip headers entirely when
   // everything lives in one directory — a lone header adds noise, not clarity.
+  const filteredSessions = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sessions
+    return sessions.filter((session) => {
+      const title = (session.title || "").toLowerCase()
+      const dir = (session.directory || "").toLowerCase()
+      return title.includes(q) || dir.includes(q)
+    })
+  }, [sessions, query])
+
   const rows = useMemo<ListRow[]>(() => {
-    const groups = groupByDirectory(sessions)
+    const groups = groupByDirectory(filteredSessions)
     if (groups.length <= 1) {
-      return sessions.map((session) => ({ type: "session", session }))
+      return filteredSessions.map((session) => ({ type: "session", session }))
     }
     const out: ListRow[] = []
     for (const group of groups) {
@@ -230,7 +242,7 @@ export default function SessionsScreen() {
       }
     }
     return out
-  }, [sessions, collapsedDirs])
+  }, [filteredSessions, collapsedDirs])
 
   // Fetch server-known projects when the new session modal opens
   useEffect(() => {
@@ -551,6 +563,33 @@ export default function SessionsScreen() {
 
       <UpdateBanner isDark={isDark} />
 
+      {sessions.length > 0 && (
+        <View style={[styles.searchBar, isDark && styles.searchBarDark]}>
+          <Ionicons name="search" size={16} color={isDark ? "#888888" : "#999999"} />
+          <TextInput
+            style={[styles.searchInput, isDark && styles.searchInputDark]}
+            placeholder={t("sessionsList.search.placeholder")}
+            placeholderTextColor={isDark ? "#666666" : "#999999"}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            testID="session-search-input"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={t("sessionsList.search.clear")}
+              testID="session-search-clear"
+            >
+              <Ionicons name="close-circle" size={18} color={isDark ? "#888888" : "#999999"} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <FlatList
         data={rows}
         keyExtractor={(row) => (row.type === "header" ? `dir:${row.directory}` : row.session.id)}
@@ -566,6 +605,8 @@ export default function SessionsScreen() {
             />
           )
         }
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? "#ffffff" : "#0a0a0a"} />
         }
@@ -576,11 +617,20 @@ export default function SessionsScreen() {
             </View>
           ) : (
             <View style={styles.emptyList}>
-              <Text style={[styles.emptyListText, isDark && styles.metaDark]}>{t("sessionsList.empty.noSessions")}</Text>
+              <Text style={[styles.emptyListText, isDark && styles.metaDark]}>
+                {query.trim()
+                  ? t("sessionsList.empty.noSearchResults", { query: query.trim() })
+                  : t("sessionsList.empty.noSessions")}
+              </Text>
+              {query.trim() ? (
+                <TouchableOpacity style={styles.emptyListAction} onPress={() => setQuery("")}>
+                  <Text style={styles.emptyListActionText}>{t("sessionsList.search.clear")}</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           )
         }
-        contentContainerStyle={sessions.length === 0 ? styles.emptyContent : undefined}
+        contentContainerStyle={[styles.listContent, rows.length === 0 && styles.emptyContent]}
       />
 
       {/* FAB to create new session */}
@@ -904,6 +954,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   connectionDot: {
     width: 8,
@@ -914,6 +966,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#0a0a0a",
+    flexShrink: 1,
   },
   connectionUrl: {
     fontSize: 12,
@@ -923,6 +976,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666666",
     flex: 1,
+    minWidth: 0,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#f5f5f5",
+  },
+  searchBarDark: {
+    backgroundColor: "#1a1a1a",
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    height: 40,
+    paddingVertical: 0,
+    fontSize: 15,
+    color: "#0a0a0a",
+  },
+  searchInputDark: {
+    color: "#ffffff",
   },
   errorBar: {
     backgroundColor: "#fef2f2",
@@ -975,13 +1055,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   sessionTitle: {
     fontSize: 16,
     fontWeight: "500",
     color: "#0a0a0a",
-    marginBottom: 4,
   },
   textDark: {
     color: "#ffffff",
@@ -1096,9 +1175,25 @@ const styles = StyleSheet.create({
   emptyListText: {
     fontSize: 16,
     color: "#666666",
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  emptyListAction: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  emptyListActionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6366f1",
   },
   emptyContent: {
     flex: 1,
+  },
+  // Keep the floating action button from covering the last row.
+  listContent: {
+    paddingBottom: 88,
   },
   fab: {
     position: "absolute",

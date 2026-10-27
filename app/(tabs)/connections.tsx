@@ -181,7 +181,7 @@ export default function ConnectionsScreen() {
             </Text>
           </View>
         }
-        contentContainerStyle={connections.length === 0 ? styles.emptyContent : undefined}
+        contentContainerStyle={[styles.listContent, connections.length === 0 && styles.emptyContent]}
       />
 
       {/* FAB to add connection */}
@@ -243,12 +243,14 @@ const styles = StyleSheet.create({
   connectionHeader: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 8,
   },
   connectionName: {
     fontSize: 16,
     fontWeight: "600",
     color: "#0a0a0a",
+    flexShrink: 1,
   },
   connectionNameActive: {
     color: "#0a0a0a",
@@ -313,6 +315,10 @@ const styles = StyleSheet.create({
   emptyContent: {
     flex: 1,
   },
+  // Keep the floating action button from covering the last row.
+  listContent: {
+    paddingBottom: 88,
+  },
   fab: {
     position: "absolute",
     right: 16,
@@ -351,11 +357,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    rowGap: 8,
   },
   settingLabel: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 1,
   },
   settingText: {
     fontSize: 14,
@@ -363,6 +372,8 @@ const styles = StyleSheet.create({
   },
   pagePicker: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: 6,
   },
   pageOption: {

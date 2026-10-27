@@ -1,0 +1,124 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - alpha
+          - beta
+          - stable
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Install dependencies
+      run: npm ci --prefer-offline --no-audit --no-fund
+      
+    - name: Build Expo React Native for Android
+      run: npx expo export -p android --platform android --output-dir dist
+      
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v1
+      with:
+        buildtools: '34.0.0'
+        ndk: '25.1.8140593'
+        platform: 'android-34'
+        
+    - name: Build Android project
+      run: |
+        cd android
+        ./gradlew clean assembleRelease --stacktrace
+        ./gradlew assembleDebug --stacktrace
+        
+    - name: Prepare APKs
+      run: |
+        mkdir -p build-output
+        cp android/app/build/outputs/apk/debug/*.apk build-output/
+        cp android/app/build/outputs/apk/release/*.apk build-output/
+        
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-apk
+        path: build-output/debug*.apk
+        retention-days: 7
+        
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: build-output/release*.apk
+        retention-days: 30
+        
+    - name: Create Release (if requested)
+      if: github.event_name == 'workflow_dispatch'
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}-android-${{ github.run_number }}
+        name: Android Build ${{ github.ref_name }}
+        body: |
+          ## 🚀 Android App Build
+          
+          ### Debug Build
+          - Built on: ${{ github.sha }}
+          - Built at: ${{ github.actor }} 
+          - Branch: ${{ github.ref_name }}
+          
+          ### Release Build
+          - Version: 0.4.16
+          - Build Type: ${{ github.event.inputs.release_type }}
+          - Changelog: Auto-generated from commit messages
+          - Files:
+            - Debug APK: `app-debug.apk`
+            - Release APK: `app-release.apk`
+            
+        draft: false
+        prerelease: ${{ github.event.inputs.release_type != 'stable' }}
+        files: |
+          build-output/debug*.apk
+          build-output/release*.apk
+          
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "Android build failed!"
+        echo "Check the GitHub Actions logs for details."

@@ -330,6 +330,7 @@ const s = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   action: {

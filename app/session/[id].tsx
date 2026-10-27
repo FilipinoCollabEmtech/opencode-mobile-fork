@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  ToastAndroid,
 } from "react-native"
 import { useLocalSearchParams, Stack, useRouter, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
@@ -221,10 +223,35 @@ export default function SessionScreen() {
   // Stable across renders (reads fresh state via getState() rather than
   // closing over props) so MessageBubble's custom memo comparator can bail
   // safely without risking a stale handler.
+  //
+  // Every message supports "Copy"; user messages additionally offer "Edit
+  // message" (revert + refill the composer). Keeping this to three buttons
+  // matters on Android, where Alert.alert silently drops anything past the
+  // third.
   const handleMessageLongPress = useCallback((messageID: string) => {
-    Alert.alert(t("session.alerts.messageActionsTitle"), undefined, [
-      { text: t("common.cancel"), style: "cancel" },
-      {
+    const state = useSessions.getState()
+    const message = state.messages.find((m) => m.id === messageID)
+    const text = (state.parts[messageID] || [])
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join("\n")
+      .trim()
+
+    const buttons: Array<{ text: string; style?: "cancel" | "destructive" | "default"; onPress?: () => void }> = []
+
+    if (text) {
+      buttons.push({
+        text: t("session.actions.copyMessage"),
+        onPress: () => {
+          void Clipboard.setStringAsync(text).then(() => {
+            if (Platform.OS === "android") ToastAndroid.show(t("session.alerts.copiedMessage"), ToastAndroid.SHORT)
+          })
+        },
+      })
+    }
+
+    if (message?.role === "user") {
+      buttons.push({
         text: t("session.actions.editMessage"),
         onPress: () => {
           const doRevert = async () => {
@@ -247,8 +274,12 @@ export default function SessionScreen() {
           }
           doRevert()
         },
-      },
-    ])
+      })
+    }
+
+    if (buttons.length === 0) return
+    buttons.push({ text: t("common.cancel"), style: "cancel" })
+    Alert.alert(t("session.alerts.messageActionsTitle"), undefined, buttons)
   }, [applyRevertResult, t])
 
   const scrollToBottom = useCallback((animated = true) => {
@@ -740,8 +771,16 @@ export default function SessionScreen() {
           <SlashPopover query={slashQuery} commands={allCommands} isDark={isDark} onSelect={handleSlashSelect} />
         )}
 
-        {/* Agent/model toolbar */}
-        <View style={[s.toolbar, isDark && s.toolbarDark]}>
+        {/* Agent/model toolbar. Horizontal so long model names, the variant
+            chip, and translated agent labels never clip off the right edge on
+            narrow screens. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[s.toolbar, isDark && s.toolbarDark]}
+          contentContainerStyle={s.toolbarContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <TouchableOpacity
             style={[s.agentChip, { borderColor: agentColor }]}
             onPress={() => cycleAgent()}
@@ -775,7 +814,7 @@ export default function SessionScreen() {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
+        </ScrollView>
 
         {/* Attachment preview */}
         <ImageAttachments attachments={attachments} isDark={isDark} onRemove={removeAttachment} />
@@ -917,16 +956,19 @@ const s = StyleSheet.create({
 
   // Toolbar
   toolbar: {
+    borderTopWidth: 1,
+    borderTopColor: "#e5e5e5",
+    backgroundColor: "#ffffff",
+    flexGrow: 0,
+  },
+  toolbarDark: { borderTopColor: "#1a1a1a", backgroundColor: "#0a0a0a" },
+  toolbarContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e5e5",
-    backgroundColor: "#ffffff",
   },
-  toolbarDark: { borderTopColor: "#1a1a1a", backgroundColor: "#0a0a0a" },
   agentChip: {
     flexDirection: "row",
     alignItems: "center",

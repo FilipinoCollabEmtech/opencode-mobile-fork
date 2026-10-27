@@ -37,9 +37,9 @@ export const MessageBubble = memo(
 
     return (
       <TouchableOpacity
-        activeOpacity={isUser && onLongPress ? 0.7 : 1}
-        onLongPress={isUser && onLongPress ? () => onLongPress(message.id) : undefined}
-        disabled={!isUser || !onLongPress}
+        activeOpacity={onLongPress ? 0.7 : 1}
+        onLongPress={onLongPress ? () => onLongPress(message.id) : undefined}
+        disabled={!onLongPress}
         style={[
           s.bubble,
           isUser ? s.user : s.assistant,
@@ -136,7 +136,7 @@ const s = StyleSheet.create({
   assistant: { backgroundColor: "#f0f0ff" },
   assistantDark: { backgroundColor: "#1a1a2e" },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  header: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 8 },
   role: { fontSize: 13, fontWeight: "600", color: "#666666" },
   roleUser: { color: "#0a0a0a" },
   textWhite: { color: "#ffffff" },
@@ -149,6 +149,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     overflow: "hidden",
+    flexShrink: 1,
   },
   modelTagDark: { backgroundColor: "#2a2a2a", color: "#888888" },
 
