@@ -61,20 +61,22 @@ export ANDROID_HOME="$HOME/android-sdk/commandlinetools"
 
 Go to your forked repository's **Settings → Secrets and variables → Actions** and add the following secrets:
 
-#### For Google Play Console (if publishing to Play Store)
-- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` - Service account JSON key
-- `PLAYSTORE_SERVICE_ACCOUNT_EMAIL` - Service account email
-- `PLAYSTORE_PACKAGE_NAME` - Your app's package name (`cc.agentlabs.opencode`)
+#### Android Signing Credentials (Required for Signed Release APKs)
+- **`ANDROID_KEYSTORE_BASE64`** — Base64 encoded `.jks` keystore file. Generate it with:
+  ```bash
+  # macOS/Linux:
+  openssl base64 -in my-release-key.jks
+  # Windows:
+  certutil -encode my-release-key.jks my-release-key.jks.b64 && Get-Content my-release-key.jks.b64
+  ```
+- **`ANDROID_KEYSTORE_PASSWORD`** — Password for your keystore
+- **`ANDROID_KEY_ALIAS`** — Alias name for the key in the keystore
+- **`ANDROID_KEY_PASSWORD`** — Password for the specific key
 
-#### For APK Signing (if using external signing)
-- `ANDROID_SIGNING_KEY_BASE64` - Base64 encoded signing key
-- `ANDROID_SIGNING_KEY_ALIAS` - Key alias
-- `ANDROID_SIGNING_KEY_PASSWORD` - Key password
-- `ANDROID_SIGNING_KEY_STORE_PASSWORD` - Keystore password
+> **Note**: If signing credentials are not provided, the workflow will still build an *unsigned* release APK for testing purposes.
 
-#### For Other Services
-- `SENTRY_AUTH_TOKEN` - Sentry authentication token (if using Sentry)
-- Any other API keys or tokens your app requires
+#### Optional
+- `SENTRY_AUTH_TOKEN` — Sentry authentication token (if using Sentry for crash reporting)
 
 ## Building Locally
 
